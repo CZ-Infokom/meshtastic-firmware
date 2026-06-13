@@ -103,7 +103,9 @@ typedef enum _meshtastic_TelemetrySensorType {
     /* TSL2561 light sensor */
     meshtastic_TelemetrySensorType_TSL2561 = 44,
     /* BH1750 light sensor */
-    meshtastic_TelemetrySensorType_BH1750 = 45
+    meshtastic_TelemetrySensorType_BH1750 = 45,
+    /* DYP-A01 waterproof ultrasonic distance sensor (UART, horn variant) */
+    meshtastic_TelemetrySensorType_DYP_A01 = 46
 } meshtastic_TelemetrySensorType;
 
 /* Struct definitions */
@@ -440,8 +442,8 @@ extern "C" {
 
 /* Helper constants for enums */
 #define _meshtastic_TelemetrySensorType_MIN meshtastic_TelemetrySensorType_SENSOR_UNSET
-#define _meshtastic_TelemetrySensorType_MAX meshtastic_TelemetrySensorType_BH1750
-#define _meshtastic_TelemetrySensorType_ARRAYSIZE ((meshtastic_TelemetrySensorType)(meshtastic_TelemetrySensorType_BH1750+1))
+#define _meshtastic_TelemetrySensorType_MAX meshtastic_TelemetrySensorType_DYP_A01
+#define _meshtastic_TelemetrySensorType_ARRAYSIZE ((meshtastic_TelemetrySensorType)(meshtastic_TelemetrySensorType_DYP_A01+1))
 
 
 

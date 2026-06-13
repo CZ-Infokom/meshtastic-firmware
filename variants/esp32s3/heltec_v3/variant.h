@@ -42,3 +42,10 @@
 #define SX126X_DIO3_TCXO_VOLTAGE 1.8
 
 #define HAS_32768HZ 1
+
+// DYP-A01 ultrasonic distance sensor on external header (GPIO41/42 — not OLED I2C on 17/18)
+#define HAS_DYP_A01 1
+#define DYP_A01_UART_RX 41 // MCU RX <- sensor TX
+#define DYP_A01_UART_TX 42 // MCU TX -> sensor RX (optional in auto-output mode)
+#define DYP_A01_UART_BAUD 9600
+#define ENVIRONMENTAL_TELEMETRY_MODULE_ENABLE 1

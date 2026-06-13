@@ -130,6 +130,10 @@ extern void drawCommonHeader(OLEDDisplay *display, int16_t x, int16_t y, const c
 #include "Sensor/IndicatorSensor.h"
 #endif
 
+#ifdef HAS_DYP_A01
+#include "Sensor/DYPA01Sensor.h"
+#endif
+
 #if __has_include(<Adafruit_TSL2561_U.h>)
 #include "Sensor/TSL2561Sensor.h"
 #endif
@@ -185,6 +189,10 @@ void EnvironmentTelemetryModule::i2cScanFinished(ScanI2C *i2cScanner)
 #ifdef SENSECAP_INDICATOR
     // Not a real I2C device, uses UART
     addSensor<IndicatorSensor>(i2cScanner, ScanI2C::DeviceType::NONE);
+#endif
+#ifdef HAS_DYP_A01
+    // UART ultrasonic distance sensor (DYP-A01)
+    addSensor<DYPA01Sensor>(i2cScanner, ScanI2C::DeviceType::NONE);
 #endif
     addSensor<RCWL9620Sensor>(i2cScanner, ScanI2C::DeviceType::RCWL9620);
     addSensor<CGRadSensSensor>(i2cScanner, ScanI2C::DeviceType::CGRADSENS);
