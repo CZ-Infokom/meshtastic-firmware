@@ -49,3 +49,20 @@
 #define GPS_TX_PIN (38) // This is for bits going TOWARDS the CPU
 #define GPS_RX_PIN (39) // This is for bits going TOWARDS the GPS
 #define GPS_THREAD_INTERVAL 50
+
+/*
+ * DYP-A01 ultrasonic (UART) on GPIO5/6 — Grove GPIO3/4 (Wire1) stays free for BME280 etc.
+ *
+ * DYP-A01 cable colors (sensor side):
+ *   1. Red    -> VCC (3.3V or 5V on Heltec)
+ *   2. Black  -> GND
+ *   3. Yellow -> sensor RX  -> Heltec GPIO6 (DYP_A01_UART_TX / MCU TX)
+ *   4. White  -> sensor TX  -> Heltec GPIO5 (DYP_A01_UART_RX / MCU RX)
+ *
+ * Yellow is only needed for controlled-output mode; auto-output mode needs White + power.
+ */
+#define HAS_DYP_A01 1
+#define DYP_A01_UART_RX 5 // MCU RX <- sensor White (TX)
+#define DYP_A01_UART_TX 6 // MCU TX -> sensor Yellow (RX), optional in auto-output mode
+#define DYP_A01_UART_BAUD 9600
+#define ENVIRONMENTAL_TELEMETRY_MODULE_ENABLE 1
