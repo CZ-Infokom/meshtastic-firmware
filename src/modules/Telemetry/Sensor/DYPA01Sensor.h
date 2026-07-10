@@ -17,13 +17,21 @@ class DYPA01Sensor : public TelemetrySensor
 
   private:
     void setupUart();
+    void flushInput();
+    void triggerMeasurement();
     bool drainAndParse();
     bool processByte(uint8_t byte);
+    bool captureDistanceSample(float &outMm);
 
     float lastDistanceMm = -1;
     bool hasValidReading = false;
     uint8_t frame[4] = {0};
     uint8_t frameLen = 0;
+    uint32_t triggerCount = 0;
+    uint32_t lastNoMetricsLogMs = 0;
+    uint32_t lastStatusLogMs = 0;
+    bool awaitingResponse = false;
+    uint32_t triggerSentMs = 0;
 };
 
 #endif

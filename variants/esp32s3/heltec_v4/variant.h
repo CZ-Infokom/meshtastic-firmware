@@ -100,10 +100,15 @@
  *   3. Yellow -> sensor RX  -> Heltec GPIO6 (DYP_A01_UART_TX / MCU TX)
  *   4. White  -> sensor TX  -> Heltec GPIO5 (DYP_A01_UART_RX / MCU RX)
  *
- * Yellow is only needed for controlled-output mode; auto-output mode needs White + power.
+ * UART output mode (sensor SKU — build flag DYP_A01_UART_CONTROLLED):
+ *   1 (default) UART controlled  — MCU triggers via Yellow; period >= 70 ms
+ *   0           UART auto-output — passive read on White; use heltec-v4-dyp-uart-auto env
+ * Optional: DYP_A01_AUTO_REALTIME=1 holds Yellow low for 100 ms frames (auto SKU only)
  */
 #define HAS_DYP_A01 1
+// GPS uses Serial1 on GPIO38/39; keep DYP on Serial2 at GPIO5/6.
+#define DYP_A01_USE_SERIAL2 1
 #define DYP_A01_UART_RX 5 // MCU RX <- sensor White (TX)
-#define DYP_A01_UART_TX 6 // MCU TX -> sensor Yellow (RX), optional in auto-output mode
+#define DYP_A01_UART_TX 6 // MCU TX -> sensor Yellow (RX)
 #define DYP_A01_UART_BAUD 9600
 #define ENVIRONMENTAL_TELEMETRY_MODULE_ENABLE 1

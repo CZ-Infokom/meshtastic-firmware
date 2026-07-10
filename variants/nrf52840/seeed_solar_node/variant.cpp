@@ -89,8 +89,10 @@ void initVariant()
     pinMode(PIN_QSPI_CS, OUTPUT);
     digitalWrite(PIN_QSPI_CS, HIGH);
     // This setup is crucial for ensuring low power consumption and proper initialization of the hardware components.
+#ifdef GPS_EN
     pinMode(GPS_EN, OUTPUT);
     digitalWrite(GPS_EN, LOW);
+#endif
 
     // VBAT_ENABLE
     pinMode(BAT_READ, OUTPUT);
@@ -102,6 +104,8 @@ void initVariant()
     digitalWrite(PIN_LED2, LOW);
     pinMode(PIN_LED2, OUTPUT);
 
+#ifdef GPS_EN
     pinMode(GPS_EN, OUTPUT);
     digitalWrite(GPS_EN, HIGH);
+#endif
 }

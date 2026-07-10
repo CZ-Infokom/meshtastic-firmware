@@ -158,6 +158,12 @@ void EnvironmentTelemetryModule::i2cScanFinished(ScanI2C *i2cScanner)
         return;
     }
     LOG_INFO("Environment Telemetry adding I2C devices...");
+    size_t sensorCountBefore = 0;
+    for (TelemetrySensor *sensor : sensors) {
+        (void)sensor;
+        sensorCountBefore++;
+    }
+    LOG_INFO("Environment Telemetry: initial sensor count=%u", (unsigned)sensorCountBefore);
 
     // order by priority of metrics/values (low top, high bottom)
 
@@ -172,7 +178,26 @@ void EnvironmentTelemetryModule::i2cScanFinished(ScanI2C *i2cScanner)
 #endif
 #ifdef HAS_DYP_A01
     // UART ultrasonic distance sensor (DYP-A01)
+    LOG_INFO("Environment Telemetry: HAS_DYP_A01 enabled, attempting to add DYP_A01 sensor");
+    size_t dypCountBefore = 0;
+    for (TelemetrySensor *sensor : sensors) {
+        (void)sensor;
+        dypCountBefore++;
+    }
     addSensor<DYPA01Sensor>(i2cScanner, ScanI2C::DeviceType::NONE);
+    size_t dypCountAfter = 0;
+    for (TelemetrySensor *sensor : sensors) {
+        (void)sensor;
+        dypCountAfter++;
+    }
+    if (dypCountAfter > dypCountBefore) {
+        LOG_INFO("Environment Telemetry: DYP_A01 sensor registered (count %u -> %u)", (unsigned)dypCountBefore,
+                 (unsigned)dypCountAfter);
+    } else {
+        LOG_ERROR("Environment Telemetry: DYP_A01 sensor was NOT registered (count stayed %u)", (unsigned)dypCountAfter);
+    }
+#else
+    LOG_INFO("Environment Telemetry: HAS_DYP_A01 not enabled in this build");
 #endif
     addSensor<RCWL9620Sensor>(i2cScanner, ScanI2C::DeviceType::RCWL9620);
     addSensor<CGRadSensSensor>(i2cScanner, ScanI2C::DeviceType::CGRADSENS);
@@ -255,6 +280,13 @@ void EnvironmentTelemetryModule::i2cScanFinished(ScanI2C *i2cScanner)
 #endif
 
 #endif
+
+    size_t sensorCountAfter = 0;
+    for (TelemetrySensor *sensor : sensors) {
+        (void)sensor;
+        sensorCountAfter++;
+    }
+    LOG_INFO("Environment Telemetry: final sensor count=%u", (unsigned)sensorCountAfter);
 }
 
 int32_t EnvironmentTelemetryModule::runOnce()

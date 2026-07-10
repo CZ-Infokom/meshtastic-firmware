@@ -25,6 +25,7 @@
 
 #define LED_GREEN PIN_LED1
 #define LED_BLUE PIN_LED2
+#define LED_BUILTIN PIN_LED1
 #define LED_STATE_ON 1 // State when LED is litted
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  Button Configuration
@@ -56,6 +57,7 @@
 #define D17 17 // P1.03 GNSS_RESET
 #define D18 18 // P1.05 GNSS_ENABLE
 #define D19 19 // P0.14 BAT_READ
+#define D20 20 // P1.04 Touch button (also usable as UART TX for DYP-A01)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  Analog Pin Definitions
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -108,12 +110,13 @@ static const uint8_t SCL = PIN_WIRE_SCL;
 #define AREF_VOLTAGE 3.3
 #define OCV_ARRAY 4200, 3986, 3922, 3812, 3734, 3645, 3527, 3420, 3281, 3087, 2786
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  GPS L76KB
+//  GPS L76KB (disabled when DYP_A01_USE_SERIAL1 — GNSS UART used for ultrasonic)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#ifndef DYP_A01_USE_SERIAL1
 #define GPS_L76K
 #ifdef GPS_L76K
-#define GPS_TX_PIN D6 // 44
-#define GPS_RX_PIN D7 // 43
+#define GPS_TX_PIN D6 // This is for bits going TOWARDS the CPU
+#define GPS_RX_PIN D7 // This is for bits going TOWARDS the GPS
 #define HAS_GPS 1
 #define GPS_BAUDRATE 9600
 #define GPS_THREAD_INTERVAL 50
@@ -121,6 +124,41 @@ static const uint8_t SCL = PIN_WIRE_SCL;
 #define PIN_SERIAL1_RX GPS_RX_PIN
 #define PIN_GPS_STANDBY D0
 #define GPS_EN D18 // P1.05
+#endif
+#endif
+
+/*
+ * DYP-A01 ultrasonic distance sensor
+ *
+ * Cable colors (sensor side):
+ *   1. Red    -> VCC (3.3V)
+ *   2. Black  -> GND
+ *   3. Yellow -> sensor RX  -> MCU TX pin below
+ *   4. White  -> sensor TX  -> MCU RX pin below
+ *
+ * Wiring builds (platformio env):
+ *   seeed_solar_node              — GNSS on Serial1 (D6/D7), DYP on Serial2 (D17/D20)
+ *   seeed_solar_node_dyp_nogps    — DYP on Serial1 (D6/D7); GNSS disabled
+ *
+ * UART output mode (sensor SKU — build flag DYP_A01_UART_CONTROLLED):
+ *   1 (default) UART controlled  — MCU triggers via Yellow; lower standby power
+ *   0           UART auto-output — passive read on White; use *_dyp_uart_auto envs
+ */
+#define HAS_DYP_A01 1
+#define DYP_A01_UART_CONTROLLED 1
+#define DYP_A01_UART_BAUD 9600
+#define ENVIRONMENTAL_TELEMETRY_MODULE_ENABLE 1
+
+#ifdef DYP_A01_USE_SERIAL1
+#define DYP_A01_UART_RX D7 // MCU RX <- sensor White (was GNSS_RX / D7)
+#define DYP_A01_UART_TX D6 // MCU TX -> sensor Yellow (was GNSS_TX / D6)
+#define PIN_SERIAL1_RX DYP_A01_UART_RX
+#define PIN_SERIAL1_TX DYP_A01_UART_TX
+#else
+#define PIN_SERIAL2_RX D17
+#define PIN_SERIAL2_TX D20
+#define DYP_A01_UART_RX D17 // MCU RX <- sensor White (D17 / GNSS_RESET pad)
+#define DYP_A01_UART_TX D20 // MCU TX -> sensor Yellow (D20 / touch pad)
 #endif
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -144,9 +182,10 @@ static const uint8_t SCL = PIN_WIRE_SCL;
 extern "C" {
 #endif
 // Serial port placeholders
-
+#ifndef PIN_SERIAL2_RX
 #define PIN_SERIAL2_RX (-1)
 #define PIN_SERIAL2_TX (-1)
+#endif
 #ifdef __cplusplus
 }
 #endif
