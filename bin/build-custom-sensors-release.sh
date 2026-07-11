@@ -142,6 +142,7 @@ cat >"$OUT/README.md" <<'EOF'
 
 - Measures only when environment telemetry is sent (mesh interval or phone sync)
 - Each send: burst of 10 samples, averaged distance published
+- Seeed nogps: DYP VCC on switched GNSS 3V3 (D18); rail off between bursts
 - Heltec V4: DYP on Serial2 (GPIO5/6); GPS keeps Serial1
 
 ## Flash

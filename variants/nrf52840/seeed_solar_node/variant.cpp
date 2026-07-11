@@ -102,9 +102,19 @@ void initVariant()
     digitalWrite(PIN_LED1, LOW);
     pinMode(PIN_LED2, OUTPUT);
     digitalWrite(PIN_LED2, LOW);
-    pinMode(PIN_LED2, OUTPUT);
 
-#ifdef GPS_EN
+#ifdef DYP_A01_POWER_EN
+    pinMode(DYP_A01_POWER_EN, OUTPUT);
+    digitalWrite(DYP_A01_POWER_EN, !DYP_A01_POWER_EN_ACTIVE);
+#ifdef PIN_GPS_STANDBY
+    pinMode(PIN_GPS_STANDBY, OUTPUT);
+    digitalWrite(PIN_GPS_STANDBY, GPS_STANDBY_ACTIVE);
+#endif
+#ifdef PIN_GPS_RESET
+    pinMode(PIN_GPS_RESET, OUTPUT);
+    digitalWrite(PIN_GPS_RESET, GPS_RESET_MODE);
+#endif
+#elif defined(GPS_EN)
     pinMode(GPS_EN, OUTPUT);
     digitalWrite(GPS_EN, HIGH);
 #endif

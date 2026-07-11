@@ -136,6 +136,8 @@ static const uint8_t SCL = PIN_WIRE_SCL;
  *   3. Yellow -> sensor RX  -> MCU TX pin below
  *   4. White  -> sensor TX  -> MCU RX pin below
  *
+ * seeed_solar_node_dyp_nogps: Red -> switched GNSS 3V3 on D18 (off between measurements).
+ *
  * Wiring builds (platformio env):
  *   seeed_solar_node              — GNSS on Serial1 (D6/D7), DYP on Serial2 (D17/D20)
  *   seeed_solar_node_dyp_nogps    — DYP on Serial1 (D6/D7); GNSS disabled
@@ -154,6 +156,24 @@ static const uint8_t SCL = PIN_WIRE_SCL;
 #define DYP_A01_UART_TX D6 // MCU TX -> sensor Yellow (was GNSS_TX / D6)
 #define PIN_SERIAL1_RX DYP_A01_UART_RX
 #define PIN_SERIAL1_TX DYP_A01_UART_TX
+
+// Switched GNSS 3V3 (TPS2291 on D18). Wire sensor Red here; rail off between bursts.
+#define DYP_A01_POWER_EN D18
+#define DYP_A01_POWER_EN_ACTIVE HIGH
+#define PIN_GPS_STANDBY D0 // Keep L76K in standby while the rail feeds DYP on shared UART
+#define PIN_GPS_RESET D17  // Hold L76K in reset for extra UART isolation
+#ifndef GPS_STANDBY_ACTIVE
+#define GPS_STANDBY_ACTIVE LOW
+#endif
+#ifndef GPS_RESET_MODE
+#define GPS_RESET_MODE HIGH
+#endif
+#ifndef DYP_A01_POWER_SETTLE_MS
+#define DYP_A01_POWER_SETTLE_MS 50
+#endif
+#ifndef DYP_A01_POWER_BOOT_MS
+#define DYP_A01_POWER_BOOT_MS 100
+#endif
 #else
 #define PIN_SERIAL2_RX D17
 #define PIN_SERIAL2_TX D20

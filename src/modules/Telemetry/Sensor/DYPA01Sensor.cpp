@@ -39,6 +39,14 @@
 #define DYP_A01_AUTO_REALTIME 0
 #endif
 
+#ifndef DYP_A01_POWER_BOOT_MS
+#define DYP_A01_POWER_BOOT_MS 100
+#endif
+
+#ifndef DYP_A01_POWER_SETTLE_MS
+#define DYP_A01_POWER_SETTLE_MS 50
+#endif
+
 #if defined(ARCH_ESP32)
 #if defined(DYP_A01_USE_SERIAL2)
 #define DYP_A01_STREAM Serial2
@@ -64,10 +72,14 @@ DYPA01Sensor::DYPA01Sensor() : TelemetrySensor(meshtastic_TelemetrySensorType_DY
 bool DYPA01Sensor::initDevice(TwoWire *bus, ScanI2C::FoundDevice *dev)
 {
     LOG_INFO("Init sensor: %s", sensorName);
+    setPeripheralPower(false);
     setupUart();
 #if DYP_A01_UART_CONTROLLED
     LOG_INFO("%s: UART controlled on-demand (%u samples/burst, gap %d ms)", sensorName, DYP_A01_BURST_SAMPLES,
              DYP_A01_MIN_TRIGGER_GAP_MS);
+#ifdef DYP_A01_POWER_EN
+    LOG_INFO("%s: switched rail on GPIO %d (off between bursts)", sensorName, DYP_A01_POWER_EN);
+#endif
 #else
     LOG_INFO("%s: UART auto-output mode (poll every %d ms)", sensorName, DYP_A01_AUTO_INTERVAL_MS);
 #if DYP_A01_AUTO_REALTIME
@@ -109,6 +121,36 @@ void DYPA01Sensor::setupUart()
 #if !DYP_A01_UART_CONTROLLED && DYP_A01_AUTO_REALTIME
     pinMode(DYP_A01_UART_TX, OUTPUT);
     digitalWrite(DYP_A01_UART_TX, LOW);
+#endif
+}
+
+void DYPA01Sensor::setPeripheralPower(bool on)
+{
+#ifdef DYP_A01_POWER_EN
+    if (on == peripheralPowerOn) {
+        return;
+    }
+    pinMode(DYP_A01_POWER_EN, OUTPUT);
+    if (on) {
+#ifdef PIN_GPS_STANDBY
+        pinMode(PIN_GPS_STANDBY, OUTPUT);
+        digitalWrite(PIN_GPS_STANDBY, GPS_STANDBY_ACTIVE);
+#endif
+#ifdef PIN_GPS_RESET
+        pinMode(PIN_GPS_RESET, OUTPUT);
+        digitalWrite(PIN_GPS_RESET, GPS_RESET_MODE);
+#endif
+        digitalWrite(DYP_A01_POWER_EN, DYP_A01_POWER_EN_ACTIVE);
+        delay(DYP_A01_POWER_SETTLE_MS);
+        delay(DYP_A01_POWER_BOOT_MS);
+        LOG_DEBUG("%s: switched rail on (GPIO %d)", sensorName, DYP_A01_POWER_EN);
+    } else {
+        digitalWrite(DYP_A01_POWER_EN, !DYP_A01_POWER_EN_ACTIVE);
+        LOG_DEBUG("%s: switched rail off (GPIO %d)", sensorName, DYP_A01_POWER_EN);
+    }
+    peripheralPowerOn = on;
+#else
+    (void)on;
 #endif
 }
 
@@ -224,6 +266,7 @@ int32_t DYPA01Sensor::runOnce()
 bool DYPA01Sensor::getMetrics(meshtastic_Telemetry *measurement)
 {
 #if DYP_A01_UART_CONTROLLED
+    setPeripheralPower(true);
     float sumMm = 0;
     uint8_t validSamples = 0;
 
@@ -235,6 +278,8 @@ bool DYPA01Sensor::getMetrics(meshtastic_Telemetry *measurement)
             LOG_DEBUG("%s: burst sample %u/%u = %.0f mm", sensorName, i + 1, DYP_A01_BURST_SAMPLES, sampleMm);
         }
     }
+
+    setPeripheralPower(false);
 
     if (validSamples == 0) {
         if (!Throttle::isWithinTimespanMs(lastNoMetricsLogMs, 5000)) {
@@ -248,7 +293,9 @@ bool DYPA01Sensor::getMetrics(meshtastic_Telemetry *measurement)
     hasValidReading = true;
     LOG_INFO("%s: distance=%.0f mm (avg of %u/%u samples)", sensorName, lastDistanceMm, validSamples, DYP_A01_BURST_SAMPLES);
 #else
+    setPeripheralPower(true);
     drainAndParse();
+    setPeripheralPower(false);
     if (!hasValidReading) {
         if (!Throttle::isWithinTimespanMs(lastNoMetricsLogMs, 5000)) {
             lastNoMetricsLogMs = millis();

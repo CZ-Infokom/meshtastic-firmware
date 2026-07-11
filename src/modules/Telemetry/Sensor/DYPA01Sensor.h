@@ -22,9 +22,11 @@ class DYPA01Sensor : public TelemetrySensor
     bool drainAndParse();
     bool processByte(uint8_t byte);
     bool captureDistanceSample(float &outMm);
+    void setPeripheralPower(bool on);
 
     float lastDistanceMm = -1;
     bool hasValidReading = false;
+    bool peripheralPowerOn = false;
     uint8_t frame[4] = {0};
     uint8_t frameLen = 0;
     uint32_t triggerCount = 0;
