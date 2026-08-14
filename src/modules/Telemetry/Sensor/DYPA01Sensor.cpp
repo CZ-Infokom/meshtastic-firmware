@@ -31,6 +31,28 @@
 #define DYP_A01_BURST_SAMPLES 9
 #endif
 
+#ifndef DYP_A01_MIN_VALID_SAMPLES
+#define DYP_A01_MIN_VALID_SAMPLES 5
+#endif
+
+#ifndef DYP_A01_MAX_BURST_ATTEMPTS
+#define DYP_A01_MAX_BURST_ATTEMPTS 2
+#endif
+
+#ifndef DYP_A01_RETRY_DELAY_MS
+#define DYP_A01_RETRY_DELAY_MS 500
+#endif
+
+#if DYP_A01_UART_CONTROLLED
+static_assert(DYP_A01_BURST_SAMPLES > 0, "DYP_A01_BURST_SAMPLES must be > 0");
+static_assert(DYP_A01_BURST_SAMPLES <= 255, "DYP_A01_BURST_SAMPLES must fit in uint8_t");
+static_assert(DYP_A01_MIN_VALID_SAMPLES > 0, "DYP_A01_MIN_VALID_SAMPLES must be > 0");
+static_assert(DYP_A01_MIN_VALID_SAMPLES <= DYP_A01_BURST_SAMPLES,
+              "DYP_A01_MIN_VALID_SAMPLES must be <= DYP_A01_BURST_SAMPLES");
+static_assert(DYP_A01_MAX_BURST_ATTEMPTS >= 1, "DYP_A01_MAX_BURST_ATTEMPTS must be >= 1");
+static_assert(DYP_A01_MAX_BURST_ATTEMPTS <= 255, "DYP_A01_MAX_BURST_ATTEMPTS must fit in uint8_t");
+#endif
+
 #ifndef DYP_A01_AUTO_INTERVAL_MS
 #define DYP_A01_AUTO_INTERVAL_MS 250
 #endif
@@ -85,15 +107,17 @@ static void sortSampleMm(float *samples, uint8_t count)
 bool DYPA01Sensor::initDevice(TwoWire *bus, ScanI2C::FoundDevice *dev)
 {
     LOG_INFO("Init sensor: %s", sensorName);
-    setPeripheralPower(false);
-    setupUart();
 #if DYP_A01_UART_CONTROLLED
-    LOG_INFO("%s: UART controlled on-demand (%u samples/burst, trigger gap %d ms)", sensorName, DYP_A01_BURST_SAMPLES,
-             DYP_A01_MIN_TRIGGER_GAP_MS);
+    setPeripheralPower(true);
+    setupUart();
+    LOG_INFO("%s: UART controlled on-demand (%u samples/burst, trigger gap %d ms, min valid %u)", sensorName,
+             DYP_A01_BURST_SAMPLES, DYP_A01_MIN_TRIGGER_GAP_MS, DYP_A01_MIN_VALID_SAMPLES);
 #ifdef DYP_A01_POWER_EN
-    LOG_INFO("%s: switched rail on GPIO %d (off between bursts)", sensorName, DYP_A01_POWER_EN);
+    LOG_INFO("%s: switched rail on GPIO %d (continuous)", sensorName, DYP_A01_POWER_EN);
 #endif
 #else
+    setPeripheralPower(false);
+    setupUart();
     LOG_INFO("%s: UART auto-output mode (poll every %d ms)", sensorName, DYP_A01_AUTO_INTERVAL_MS);
 #if DYP_A01_AUTO_REALTIME
     LOG_INFO("%s: auto real-time output (sensor RX held low)", sensorName);
@@ -145,11 +169,12 @@ void DYPA01Sensor::setPeripheralPower(bool on)
     }
     pinMode(DYP_A01_POWER_EN, OUTPUT);
     if (on) {
-#ifdef PIN_GPS_STANDBY
+#if defined(PIN_GPS_STANDBY) && !(defined(HAS_GPS) && HAS_GPS)
+        // Shared-UART no-GPS builds: keep L76K in standby so it cannot drive Serial1.
         pinMode(PIN_GPS_STANDBY, OUTPUT);
         digitalWrite(PIN_GPS_STANDBY, GPS_STANDBY_ACTIVE);
 #endif
-#ifdef PIN_GPS_RESET
+#if defined(PIN_GPS_RESET) && !(defined(HAS_GPS) && HAS_GPS)
         pinMode(PIN_GPS_RESET, OUTPUT);
         digitalWrite(PIN_GPS_RESET, GPS_RESET_MODE);
 #endif
@@ -257,6 +282,19 @@ bool DYPA01Sensor::captureDistanceSample(float &outMm)
     return gotSample;
 }
 
+uint8_t DYPA01Sensor::captureBurst(float *samples)
+{
+    uint8_t validSamples = 0;
+    for (uint8_t i = 0; i < DYP_A01_BURST_SAMPLES; i++) {
+        float sampleMm = 0;
+        if (captureDistanceSample(sampleMm)) {
+            samples[validSamples++] = sampleMm;
+            LOG_DEBUG("%s: burst sample %u/%u = %.0f mm", sensorName, i + 1, DYP_A01_BURST_SAMPLES, sampleMm);
+        }
+    }
+    return validSamples;
+}
+
 int32_t DYPA01Sensor::runOnce()
 {
     if (!initialized) {
@@ -279,24 +317,32 @@ int32_t DYPA01Sensor::runOnce()
 bool DYPA01Sensor::getMetrics(meshtastic_Telemetry *measurement)
 {
 #if DYP_A01_UART_CONTROLLED
-    setPeripheralPower(true);
     float samples[DYP_A01_BURST_SAMPLES];
     uint8_t validSamples = 0;
+    uint8_t successfulAttempt = 0;
 
-    for (uint8_t i = 0; i < DYP_A01_BURST_SAMPLES; i++) {
-        float sampleMm = 0;
-        if (captureDistanceSample(sampleMm)) {
-            samples[validSamples++] = sampleMm;
-            LOG_DEBUG("%s: burst sample %u/%u = %.0f mm", sensorName, i + 1, DYP_A01_BURST_SAMPLES, sampleMm);
+    for (uint8_t attempt = 1; attempt <= DYP_A01_MAX_BURST_ATTEMPTS; attempt++) {
+        validSamples = captureBurst(samples);
+
+        if (validSamples >= DYP_A01_MIN_VALID_SAMPLES) {
+            successfulAttempt = attempt;
+            break;
+        }
+
+        LOG_DEBUG("%s: burst attempt %u rejected: %u/%u valid samples (need >=%u)%s", sensorName, attempt, validSamples,
+                  DYP_A01_BURST_SAMPLES, DYP_A01_MIN_VALID_SAMPLES,
+                  (attempt < DYP_A01_MAX_BURST_ATTEMPTS) ? ", retrying" : "");
+
+        if (attempt < DYP_A01_MAX_BURST_ATTEMPTS) {
+            delay(DYP_A01_RETRY_DELAY_MS);
         }
     }
 
-    setPeripheralPower(false);
-
-    if (validSamples == 0) {
+    if (successfulAttempt == 0) {
+        hasValidReading = false;
         if (!Throttle::isWithinTimespanMs(lastNoMetricsLogMs, 5000)) {
             lastNoMetricsLogMs = millis();
-            LOG_DEBUG("%s: burst had no valid distance samples", sensorName);
+            LOG_DEBUG("%s: measurement failed after %u attempts", sensorName, DYP_A01_MAX_BURST_ATTEMPTS);
         }
         return false;
     }
@@ -304,8 +350,13 @@ bool DYPA01Sensor::getMetrics(meshtastic_Telemetry *measurement)
     sortSampleMm(samples, validSamples);
     lastDistanceMm = samples[validSamples / 2];
     hasValidReading = true;
-    LOG_INFO("%s: distance=%.0f mm (median %u/%u, min=%.0f max=%.0f)", sensorName, lastDistanceMm, validSamples,
-             DYP_A01_BURST_SAMPLES, samples[0], samples[validSamples - 1]);
+    if (successfulAttempt > 1) {
+        LOG_INFO("%s: distance=%.0f mm (attempt %u, median %u/%u, min=%.0f max=%.0f)", sensorName, lastDistanceMm,
+                 successfulAttempt, validSamples, DYP_A01_BURST_SAMPLES, samples[0], samples[validSamples - 1]);
+    } else {
+        LOG_INFO("%s: distance=%.0f mm (median %u/%u, min=%.0f max=%.0f)", sensorName, lastDistanceMm, validSamples,
+                 DYP_A01_BURST_SAMPLES, samples[0], samples[validSamples - 1]);
+    }
 #else
     setPeripheralPower(true);
     drainAndParse();
