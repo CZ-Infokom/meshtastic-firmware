@@ -24,11 +24,11 @@
 #endif
 
 #ifndef DYP_A01_MIN_TRIGGER_GAP_MS
-#define DYP_A01_MIN_TRIGGER_GAP_MS 80
+#define DYP_A01_MIN_TRIGGER_GAP_MS 150
 #endif
 
 #ifndef DYP_A01_BURST_SAMPLES
-#define DYP_A01_BURST_SAMPLES 10
+#define DYP_A01_BURST_SAMPLES 9
 #endif
 
 #ifndef DYP_A01_AUTO_INTERVAL_MS
@@ -69,13 +69,26 @@
 
 DYPA01Sensor::DYPA01Sensor() : TelemetrySensor(meshtastic_TelemetrySensorType_DYP_A01, "DYP_A01") {}
 
+static void sortSampleMm(float *samples, uint8_t count)
+{
+    for (uint8_t i = 1; i < count; i++) {
+        float key = samples[i];
+        int j = (int)i - 1;
+        while (j >= 0 && samples[j] > key) {
+            samples[j + 1] = samples[j];
+            j--;
+        }
+        samples[j + 1] = key;
+    }
+}
+
 bool DYPA01Sensor::initDevice(TwoWire *bus, ScanI2C::FoundDevice *dev)
 {
     LOG_INFO("Init sensor: %s", sensorName);
     setPeripheralPower(false);
     setupUart();
 #if DYP_A01_UART_CONTROLLED
-    LOG_INFO("%s: UART controlled on-demand (%u samples/burst, gap %d ms)", sensorName, DYP_A01_BURST_SAMPLES,
+    LOG_INFO("%s: UART controlled on-demand (%u samples/burst, trigger gap %d ms)", sensorName, DYP_A01_BURST_SAMPLES,
              DYP_A01_MIN_TRIGGER_GAP_MS);
 #ifdef DYP_A01_POWER_EN
     LOG_INFO("%s: switched rail on GPIO %d (off between bursts)", sensorName, DYP_A01_POWER_EN);
@@ -267,14 +280,13 @@ bool DYPA01Sensor::getMetrics(meshtastic_Telemetry *measurement)
 {
 #if DYP_A01_UART_CONTROLLED
     setPeripheralPower(true);
-    float sumMm = 0;
+    float samples[DYP_A01_BURST_SAMPLES];
     uint8_t validSamples = 0;
 
     for (uint8_t i = 0; i < DYP_A01_BURST_SAMPLES; i++) {
         float sampleMm = 0;
         if (captureDistanceSample(sampleMm)) {
-            sumMm += sampleMm;
-            validSamples++;
+            samples[validSamples++] = sampleMm;
             LOG_DEBUG("%s: burst sample %u/%u = %.0f mm", sensorName, i + 1, DYP_A01_BURST_SAMPLES, sampleMm);
         }
     }
@@ -289,9 +301,11 @@ bool DYPA01Sensor::getMetrics(meshtastic_Telemetry *measurement)
         return false;
     }
 
-    lastDistanceMm = sumMm / validSamples;
+    sortSampleMm(samples, validSamples);
+    lastDistanceMm = samples[validSamples / 2];
     hasValidReading = true;
-    LOG_INFO("%s: distance=%.0f mm (avg of %u/%u samples)", sensorName, lastDistanceMm, validSamples, DYP_A01_BURST_SAMPLES);
+    LOG_INFO("%s: distance=%.0f mm (median %u/%u, min=%.0f max=%.0f)", sensorName, lastDistanceMm, validSamples,
+             DYP_A01_BURST_SAMPLES, samples[0], samples[validSamples - 1]);
 #else
     setPeripheralPower(true);
     drainAndParse();
