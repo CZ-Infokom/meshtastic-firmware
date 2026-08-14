@@ -321,7 +321,8 @@ bool DYPA01Sensor::getMetrics(meshtastic_Telemetry *measurement)
     uint8_t validSamples = 0;
     uint8_t successfulAttempt = 0;
 
-    for (uint8_t attempt = 1; attempt <= DYP_A01_MAX_BURST_ATTEMPTS; attempt++) {
+    for (uint8_t attemptIndex = 0; attemptIndex < DYP_A01_MAX_BURST_ATTEMPTS; attemptIndex++) {
+        const uint8_t attempt = attemptIndex + 1;
         validSamples = captureBurst(samples);
 
         if (validSamples >= DYP_A01_MIN_VALID_SAMPLES) {
@@ -331,9 +332,9 @@ bool DYPA01Sensor::getMetrics(meshtastic_Telemetry *measurement)
 
         LOG_DEBUG("%s: burst attempt %u rejected: %u/%u valid samples (need >=%u)%s", sensorName, attempt, validSamples,
                   DYP_A01_BURST_SAMPLES, DYP_A01_MIN_VALID_SAMPLES,
-                  (attempt < DYP_A01_MAX_BURST_ATTEMPTS) ? ", retrying" : "");
+                  (attemptIndex + 1 < DYP_A01_MAX_BURST_ATTEMPTS) ? ", retrying" : "");
 
-        if (attempt < DYP_A01_MAX_BURST_ATTEMPTS) {
+        if (attemptIndex + 1 < DYP_A01_MAX_BURST_ATTEMPTS) {
             delay(DYP_A01_RETRY_DELAY_MS);
         }
     }
